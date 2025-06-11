@@ -8,7 +8,7 @@ from flask import Flask, request # استيراد Flask و request
 
 # 1. مفتاح API الخاص بالبوت (احصل عليه من BotFather)
 # تأكد من أن هذا هو توكن بوت التواصل الخاص بك
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "7880508466:AAGNAkCwKW_xJb5GEnuD_qUYFJNnbbk7UUk")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "7880508466:AAG2LVg-tb_UGu8O6eMv2FfKfO0dfr1VQcU")
 
 # 2. معرف حسابك الشخصي على تيليجرام (مهم جداً!)
 # استبدل هذا بمعرف حسابك الشخصي الذي حصلت عليه من @userinfobot
