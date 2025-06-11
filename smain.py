@@ -2,24 +2,30 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from telegram.constants import ParseMode 
 import re 
-import os
-import datetime # لاستخدام الوقت لتحديد متى يتم إرسال رسالة الشكر مرة أخرى
+import datetime 
+import os # تأكد من وجود هذا الاستيراد
+from flask import Flask, request # استيراد Flask و request
 
 # 1. مفتاح API الخاص بالبوت (احصل عليه من BotFather)
-BOT_TOKEN = "7880508466:AAGNAkCwKW_xJb5GEnuD_qUYFJNnbbk7UUk" 
+# تأكد من أن هذا هو توكن بوت التواصل الخاص بك
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "7880508466:AAGNAkCwKW_xJb5GEnuD_qUYFJNnbbk7UUk")
 
 # 2. معرف حسابك الشخصي على تيليجرام (مهم جداً!)
-OWNER_TELEGRAM_ID = 7266015804 
+# استبدل هذا بمعرف حسابك الشخصي الذي حصلت عليه من @userinfobot
+OWNER_TELEGRAM_ID = int(os.environ.get("OWNER_TELEGRAM_ID", "7266015804")) # يجب أن يكون رقماً
 
 # دالة مساعدة للهروب من أحرف Markdown V2 الخاصة
 def escape_markdown_v2(text: str) -> str:
     """تفرغ الأحرف الخاصة في نص MarkdownV2."""
     escape_chars = r'_*[]()~`>#+-=|{}.!'
+    # استخدام re.sub لتغيير كل حرف خاص بـ '\' + الحرف نفسه
     return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
-# دالة إرسال إخطار للمالك (تم إبقاءها لرسائل الأخطاء فقط)
+# دالة إرسال إخطار للمالك
 async def send_owner_notification(context: CallbackContext, message: str):
     try:
+        # تبسيط نص الإخطار بشكل جذري لتجنب أي أحرف خاصة
+        # كل النص سيتم الهروب منه بواسطة دالة escape_markdown_v2
         notification_prefix = escape_markdown_v2("🤖 إخطار البوت (للمالك):\n")
         escaped_message = escape_markdown_v2(message)
         final_notification_text = notification_prefix + escaped_message
@@ -53,12 +59,32 @@ async def handle_message(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     user_first_name = update.effective_user.first_name
     
-    # إزالة معظم رسائل send_owner_notification لتقليل الضوضاء
-    # فقط رسائل الخطأ ستبقى ترسل إخطار للمالك
+    # رسائل التتبع للمالك (في الطرفية فقط، وليس في الشات)
+    print(f"\n--- رسالة جديدة ---")
+    print(f"رسالة واردة من User ID: {user_id}")
+    if update.message.text:
+        print(f"نص الرسالة: {update.message.text}")
+    if update.message.caption:
+        print(f"تسمية الرسالة (caption): {update.message.caption}")
+    if update.message.reply_to_message:
+        replied_to_message = update.message.reply_to_message
+        print(f"الرسالة التي تم الرد عليها ID: {replied_to_message.message_id}")
+        print(f"مرسل الرسالة التي تم الرد عليها ID: {replied_to_message.from_user.id}")
+        print(f"نص الرسالة التي تم الرد عليها: {replied_to_message.text}")
+        print(f"تسمية الرسالة التي تم الرد عليها (caption): {replied_to_message.caption}")
+        print(f"الرسالة التي تم الرد عليها بالكامل (to_dict()): {replied_to_message.to_dict()}")
+    # --- نهاية قسم التصحيح ---
+
 
     # إذا كانت الرسالة من مالك البوت (أنت)
     if user_id == OWNER_TELEGRAM_ID:
+        # إخطار في الطرفية أن الرسالة من المالك
+        print(f"الرسالة من المالك (ID: {user_id})")
+
         if update.message.reply_to_message:
+            # إخطار في الطرفية أن المالك قام بالرد
+            print(f"المالك قام بالرد على رسالة ID: {update.message.reply_to_message.message_id}")
+
             replied_to_message_text = update.message.reply_to_message.text 
             replied_to_message_caption = update.message.reply_to_message.caption 
 
@@ -73,23 +99,23 @@ async def handle_message(update: Update, context: CallbackContext):
             if match:
                 try:
                     original_user_id = int(match.group(1))
-                    # لا يوجد إخطار للمالك هنا إذا تم الاستخراج بنجاح
+                    print(f"تم استخراج User ID: {original_user_id} من الرسالة (نمط جديد).") # طباعة في الطرفية
                 except ValueError:
-                    await send_owner_notification(context, "خطأ: فشل تحويل User ID المستخرج إلى رقم في رد المالك.")
+                    await send_owner_notification(context, "خطأ: فشل تحويل User ID المستخرج إلى رقم في رد المالك.") # إخطار في الشات فقط في حالة الخطأ
             
             if not original_user_id and update.message.reply_to_message.entities:
                 for entity in update.message.reply_to_message.entities:
                     if entity.type == 'text_link' and hasattr(entity, 'url') and 'user_id:' in entity.url:
                         try:
                             original_user_id = int(entity.url.split('user_id:')[1])
-                            # لا يوجد إخطار للمالك هنا
+                            print(f"تم استخراج User ID: {original_user_id} من الرابط المخفي.") # طباعة في الطرفية
                             break
                         except (ValueError, IndexError):
-                            await send_owner_notification(context, "خطأ: فشل استخراج User ID من الرابط المخفي في entities.")
+                            await send_owner_notification(context, "خطأ: فشل استخراج User ID من الرابط المخفي في entities.") # إخطار في الشات فقط في حالة الخطأ
                             pass
 
             if original_user_id:
-                # لا يوجد إخطار للمالك هنا
+                print(f"User ID موجود: {original_user_id}. محاولة إرسال الرد.") # طباعة في الطرفية
                 try:
                     replied_message_text_escaped = escape_markdown_v2(update.message.text) if update.message.text else "" 
                     replied_message_caption_escaped = escape_markdown_v2(update.message.caption) if update.message.caption else "" 
@@ -115,22 +141,24 @@ async def handle_message(update: Update, context: CallbackContext):
                             parse_mode=ParseMode.MARKDOWN_V2
                         )
                     else: 
-                         await update.message.reply_text("لا يوجد محتوى في رسالتك للرد به.")
+                         # رسالة خطأ فقط في الطرفية
+                         print("خطأ: لا يوجد محتوى في رسالة المالك للرد به.")
+                         # لا يوجد رد في الشات للمالك هنا
                          return
 
-                    await update.message.reply_text("تم إرسال ردك إلى المستخدم بنجاح.")
-                    # لا يوجد إخطار للمالك هنا
+                    # تم إزالة رسالة "تم إرسال ردك إلى المستخدم بنجاح." من الشات
+                    print(f"تم إرسال الرد بنجاح إلى User ID: {original_user_id}.") # التأكيد في الطرفية
                 except Exception as e:
-                    await send_owner_notification(context, f"خطأ حرج: فشل إرسال رد المالك للمستخدم الأصلي: {e}")
-                    await update.message.reply_text(f"لم أتمكن من إرسال ردك: {e}")
+                    await send_owner_notification(context, f"خطأ حرج: فشل إرسال رد المالك للمستخدم الأصلي: {e}") # إخطار في الشات فقط في حالة الخطأ
+                    await update.message.reply_text(f"لم أتمكن من إرسال ردك: {e}") # رد في الشات للمالك فقط في حالة الخطأ
             else:
-                await send_owner_notification(context, "خطأ: User ID غير موجود في الرسالة التي تم الرد عليها (تأكد من أن الرسالة تحتوي عليه).")
+                await send_owner_notification(context, "خطأ: User ID غير موجود في الرسالة التي تم الرد عليها (تأكد من أن الرسالة تحتوي عليه).") # إخطار في الشات فقط في حالة الخطأ
                 await update.message.reply_text(
                     "لا يمكنني تحديد المستخدم الأصلي للرسالة التي رددت عليها.\n"
                     "يرجى التأكد من أنك ترد مباشرةً على رسالة *من مستخدم آخر* التي تتضمن معلوماته."
                 )
         else:
-            await send_owner_notification(context, "خطأ: رسالة المالك ليست رداً على أي شيء (لذلك لا يمكن تحديد المستخدم الأصلي).")
+            await send_owner_notification(context, "خطأ: رسالة المالك ليست رداً على أي شيء (لذلك لا يمكن تحديد المستخدم الأصلي).") # إخطار في الشات فقط في حالة الخطأ
             await update.message.reply_text(
                 "رسالتك هذه ليست رداً على مستخدم.\n"
                 "تذكر، للرد على المستخدمين، يجب أن ترد مباشرةً على الرسالة التي تتضمن معلوماتهم."
@@ -138,6 +166,7 @@ async def handle_message(update: Update, context: CallbackContext):
     # إذا كانت الرسالة من مستخدم عادي (ليس مالك البوت)
     else:
         # لا يوجد إخطار للمالك هنا
+        print(f"رسالة من مستخدم عادي (ID: {user_id}). محاولة إعادة توجيهها.") # طباعة في الطرفية
         user_message_text_escaped = escape_markdown_v2(update.message.text) if update.message.text else ""
         user_message_caption_escaped = escape_markdown_v2(update.message.caption) if update.message.caption else ""
 
@@ -179,46 +208,55 @@ async def handle_message(update: Update, context: CallbackContext):
                 )
             
             # التحكم في رسالة "شكراً لك" للمستخدم
-            # يتم إرسالها فقط إذا لم يتم إرسالها خلال آخر 24 ساعة (لتجنب الإزعاج)
-            # أو إذا كانت المرة الأولى للمستخدم
             time_since_last_thank_you = (datetime.datetime.now() - context.user_data.get('last_thank_you_message_sent', datetime.datetime.min)).total_seconds()
             
-            if time_since_last_thank_you > 24 * 3600 or 'last_thank_you_message_sent' not in context.user_data: # 24 ساعة
+            if time_since_last_thank_you > 24 * 3600 or 'last_thank_you_message_sent' not in context.user_data: 
                  await update.message.reply_text("شكراً لك! لقد تم إيصال رسالتك إلى المطور وسيتم الرد عليك قريباً.")
                  context.user_data['last_thank_you_message_sent'] = datetime.datetime.now()
-            # لا نرسل شيئاً إذا كانت المدة أقل من 24 ساعة
 
         except Exception as e:
-            await send_owner_notification(context, f"خطأ حرج: فشل إرسال رسالة المستخدم (ID: {user_id}) إلى المالك: {e}")
-            await update.message.reply_text(f"عذراً، حدث خطأ أثناء إرسال رسالتك: {e}")
+            await send_owner_notification(context, f"خطأ حرج: فشل إرسال رسالة المستخدم (ID: {user_id}) إلى المالك: {e}") # إخطار في الشات فقط في حالة الخطأ
+            await update.message.reply_text(f"عذراً، حدث خطأ أثناء إرسال رسالتك: {e}") # رد في الشات للمالك فقط في حالة الخطأ
 
+# --- بداية إضافة Flask ---
+app = Flask(__name__)
+
+# المتغيرات العالمية لتطبيق python-telegram-bot
+application_ptb = None 
+
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+async def telegram_webhook():
+    global application_ptb 
+    if application_ptb is None:
+        print("خطأ: تطبيق python-telegram-bot لم تتم تهيئته بعد.")
+        return "Internal Server Error", 500
+
+    await application_ptb.update_queue.put(Update.de_json(request.get_json(force=True), application_ptb.bot))
+    return "ok"
 
 # الدالة الرئيسية لتشغيل البوت
 def main():
-    application = Application.builder().token(BOT_TOKEN).build()
+    global application_ptb 
+    application_ptb = Application.builder().token(BOT_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
+    application_ptb.add_handler(CommandHandler("start", start))
+    application_ptb.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
 
     print("بوت التواصل يعمل الآن...")
     
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
+    PORT = int(os.environ.get('PORT', '10000')) 
 
-    WEBHOOK_URL = os.environ.get('WEBHOOK_URL') # Render يوفر هذا المتغير تلقائياً
-    PORT = int(os.environ.get('PORT', '10000')) # Render يوفر هذا المتغير تلقائياً، استخدم 10000 كافتراضي
-
-    if WEBHOOK_URL: # إذا كان هناك WEBHOOK_URL (يعني أننا في بيئة نشر)
+    if WEBHOOK_URL: 
         print(f"بدء البوت باستخدام Webhook على المنفذ: {PORT}")
         print(f"Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
-        application.run_webhook(
-            listen="0.0.0.0", # الاستماع على جميع الواجهات
-            port=PORT,
-            url_path=BOT_TOKEN, # استخدم التوكن كمسار فريد للـ webhook
-            webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"
-        )
-    else: # إذا لم يكن هناك WEBHOOK_URL (يعني أننا في بيئة تطوير محلية)
+        
+        application_ptb.run_once(application_ptb.bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}"))
+
+        app.run(host="0.0.0.0", port=PORT)
+    else: 
         print("بدء البوت باستخدام Polling محلياً...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    # --- نهاية التعديل ---
+        application_ptb.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()
