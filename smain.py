@@ -4,7 +4,8 @@ from telegram.constants import ParseMode
 import re 
 import datetime 
 import os 
-from flask import Flask, request # استيراد Flask و request
+# تم إزالة استيراد Flask و request هنا لأننا لن نستخدم Flask في Worker
+# from flask import Flask, request
 
 # 1. مفتاح API الخاص بالبوت (احصل عليه من BotFather)
 # تأكد من أن هذا هو توكن بوت التواصل الخاص بك
@@ -24,8 +25,6 @@ def escape_markdown_v2(text: str) -> str:
 # دالة إرسال إخطار للمالك
 async def send_owner_notification(context: CallbackContext, message: str):
     try:
-        # تبسيط نص الإخطار بشكل جذري لتجنب أي أحرف خاصة
-        # كل النص سيتم الهروب منه بواسطة دالة escape_markdown_v2
         notification_prefix = escape_markdown_v2("🤖 إخطار البوت (للمالك):\n")
         escaped_message = escape_markdown_v2(message)
         final_notification_text = notification_prefix + escaped_message
@@ -51,7 +50,6 @@ async def start(update: Update, context: CallbackContext):
             "أنا بوت التواصل الخاص بالمطور. يمكنك إرسال رسالتك هنا، وسأقوم بإيصالها له.\n"
             "سيقوم المطور بالرد عليك قريباً عبر هذا البوت."
         )
-        # عند البدء، سجل أن رسالة الشكر قد أُرسلت للمستخدم
         context.user_data['last_thank_you_message_sent'] = datetime.datetime.now()
 
 # دالة معالجة جميع الرسائل الواردة
@@ -94,6 +92,7 @@ async def handle_message(update: Update, context: CallbackContext):
             if replied_to_message_caption:
                 search_text += "\n" + replied_to_message_caption 
 
+            # **التعديل هنا:** تغيير نمط البحث عن User ID
             match = re.search(r"User ID:\s*(\d+)", search_text) 
             if match:
                 try:
@@ -213,20 +212,18 @@ async def handle_message(update: Update, context: CallbackContext):
             await update.message.reply_text(f"عذراً، حدث خطأ أثناء إرسال رسالتك: {e}")
 
 # --- بداية إضافة Flask ---
-app = Flask(__name__)
+# تم إزالة هذه الأسطر لأنها لم تعد تستخدم مع worker
+# app = Flask(__name__)
+# application_ptb = None 
+# @app.route(f"/{BOT_TOKEN}", methods=["POST"])
+# async def telegram_webhook():
+#     global application_ptb 
+#     if application_ptb is None:
+#         print("خطأ: تطبيق python-telegram-bot لم تتم تهيئته بعد.")
+#         return "Internal Server Error", 500
+#     await application_ptb.update_queue.put(Update.de_json(request.get_json(force=True), application_ptb.bot))
+#     return "ok"
 
-# المتغيرات العالمية لتطبيق python-telegram-bot
-application_ptb = None 
-
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
-async def telegram_webhook():
-    global application_ptb 
-    if application_ptb is None:
-        print("خطأ: تطبيق python-telegram-bot لم تتم تهيئته بعد.")
-        return "Internal Server Error", 500
-
-    await application_ptb.update_queue.put(Update.de_json(request.get_json(force=True), application_ptb.bot))
-    return "ok"
 
 # الدالة الرئيسية لتشغيل البوت
 def main():
@@ -238,19 +235,25 @@ def main():
 
     print("بوت التواصل يعمل الآن...")
     
-    WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
-    PORT = int(os.environ.get('PORT', '10000')) 
+    # تم إزالة هذا الجزء الخاص بـ WEBHOOK_URL و Flask
+    # WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
+    # PORT = int(os.environ.get('PORT', '10000')) 
 
-    if WEBHOOK_URL: 
-        print(f"بدء البوت باستخدام Webhook على المنفذ: {PORT}")
-        print(f"Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
+    # if WEBHOOK_URL: 
+    #     print(f"بدء البوت باستخدام Webhook على المنفذ: {PORT}")
+    #     print(f"Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
         
-        application_ptb.run_once(application_ptb.bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}"))
+    #     application_ptb.run_once(application_ptb.bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}"))
 
-        app.run(host="0.0.0.0", port=PORT)
-    else: 
-        print("بدء البوت باستخدام Polling محلياً...")
-        application_ptb.run_polling(allowed_updates=Update.ALL_TYPES)
+    #     app.run(host="0.0.0.0", port=PORT)
+    # else: 
+    #     print("بدء البوت باستخدام Polling محلياً...")
+    #     application_ptb.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    # هذا هو السطر الوحيد الذي يجب أن يكون في هذا الجزء للنشر كـ Background Worker
+    print("بدء البوت باستخدام Polling...")
+    application_ptb.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == '__main__':
     main()
