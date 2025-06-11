@@ -200,7 +200,26 @@ def main():
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
 
     print("بوت التواصل يعمل الآن...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # --- التعديل هنا: استخدام Webhooks للنشر على Render ---
+    import os # تأكد من استيراد os في بداية الملف إذا لم يكن موجوداً
+
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL') # Render يوفر هذا المتغير تلقائياً
+    PORT = int(os.environ.get('PORT', '10000')) # Render يوفر هذا المتغير تلقائياً، استخدم 10000 كافتراضي
+
+    if WEBHOOK_URL: # إذا كان هناك WEBHOOK_URL (يعني أننا في بيئة نشر)
+        print(f"بدء البوت باستخدام Webhook على المنفذ: {PORT}")
+        print(f"Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
+        application.run_webhook(
+            listen="0.0.0.0", # الاستماع على جميع الواجهات
+            port=PORT,
+            url_path=BOT_TOKEN, # استخدم التوكن كمسار فريد للـ webhook
+            webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"
+        )
+    else: # إذا لم يكن هناك WEBHOOK_URL (يعني أننا في بيئة تطوير محلية)
+        print("بدء البوت باستخدام Polling محلياً...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # --- نهاية التعديل ---
 
 if __name__ == '__main__':
     main()
