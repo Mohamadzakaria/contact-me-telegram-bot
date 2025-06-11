@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode 
 import re 
 import datetime 
-import os # تأكد من وجود هذا الاستيراد
+import os 
 from flask import Flask, request # استيراد Flask و request
 
 # 1. مفتاح API الخاص بالبوت (احصل عليه من BotFather)
@@ -94,7 +94,6 @@ async def handle_message(update: Update, context: CallbackContext):
             if replied_to_message_caption:
                 search_text += "\n" + replied_to_message_caption 
 
-            # **التحسين هنا:** تغيير نمط البحث عن User ID
             match = re.search(r"User ID:\s*(\d+)", search_text) 
             if match:
                 try:
@@ -141,32 +140,28 @@ async def handle_message(update: Update, context: CallbackContext):
                             parse_mode=ParseMode.MARKDOWN_V2
                         )
                     else: 
-                         # رسالة خطأ فقط في الطرفية
                          print("خطأ: لا يوجد محتوى في رسالة المالك للرد به.")
-                         # لا يوجد رد في الشات للمالك هنا
                          return
 
-                    # تم إزالة رسالة "تم إرسال ردك إلى المستخدم بنجاح." من الشات
-                    print(f"تم إرسال الرد بنجاح إلى User ID: {original_user_id}.") # التأكيد في الطرفية
+                    print(f"تم إرسال الرد بنجاح إلى User ID: {original_user_id}.") 
                 except Exception as e:
-                    await send_owner_notification(context, f"خطأ حرج: فشل إرسال رد المالك للمستخدم الأصلي: {e}") # إخطار في الشات فقط في حالة الخطأ
-                    await update.message.reply_text(f"لم أتمكن من إرسال ردك: {e}") # رد في الشات للمالك فقط في حالة الخطأ
+                    await send_owner_notification(context, f"خطأ حرج: فشل إرسال رد المالك للمستخدم الأصلي: {e}") 
+                    await update.message.reply_text(f"لم أتمكن من إرسال ردك: {e}") 
             else:
-                await send_owner_notification(context, "خطأ: User ID غير موجود في الرسالة التي تم الرد عليها (تأكد من أن الرسالة تحتوي عليه).") # إخطار في الشات فقط في حالة الخطأ
+                await send_owner_notification(context, "خطأ: User ID غير موجود في الرسالة التي تم الرد عليها (تأكد من أن الرسالة تحتوي عليه).") 
                 await update.message.reply_text(
                     "لا يمكنني تحديد المستخدم الأصلي للرسالة التي رددت عليها.\n"
                     "يرجى التأكد من أنك ترد مباشرةً على رسالة *من مستخدم آخر* التي تتضمن معلوماته."
                 )
         else:
-            await send_owner_notification(context, "خطأ: رسالة المالك ليست رداً على أي شيء (لذلك لا يمكن تحديد المستخدم الأصلي).") # إخطار في الشات فقط في حالة الخطأ
+            await send_owner_notification(context, "خطأ: رسالة المالك ليست رداً على أي شيء (لذلك لا يمكن تحديد المستخدم الأصلي).") 
             await update.message.reply_text(
                 "رسالتك هذه ليست رداً على مستخدم.\n"
                 "تذكر، للرد على المستخدمين، يجب أن ترد مباشرةً على الرسالة التي تتضمن معلوماتهم."
             )
     # إذا كانت الرسالة من مستخدم عادي (ليس مالك البوت)
     else:
-        # لا يوجد إخطار للمالك هنا
-        print(f"رسالة من مستخدم عادي (ID: {user_id}). محاولة إعادة توجيهها.") # طباعة في الطرفية
+        print(f"رسالة من مستخدم عادي (ID: {user_id}). محاولة إعادة توجيهها.") 
         user_message_text_escaped = escape_markdown_v2(update.message.text) if update.message.text else ""
         user_message_caption_escaped = escape_markdown_v2(update.message.caption) if update.message.caption else ""
 
@@ -207,7 +202,6 @@ async def handle_message(update: Update, context: CallbackContext):
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
             
-            # التحكم في رسالة "شكراً لك" للمستخدم
             time_since_last_thank_you = (datetime.datetime.now() - context.user_data.get('last_thank_you_message_sent', datetime.datetime.min)).total_seconds()
             
             if time_since_last_thank_you > 24 * 3600 or 'last_thank_you_message_sent' not in context.user_data: 
@@ -215,8 +209,8 @@ async def handle_message(update: Update, context: CallbackContext):
                  context.user_data['last_thank_you_message_sent'] = datetime.datetime.now()
 
         except Exception as e:
-            await send_owner_notification(context, f"خطأ حرج: فشل إرسال رسالة المستخدم (ID: {user_id}) إلى المالك: {e}") # إخطار في الشات فقط في حالة الخطأ
-            await update.message.reply_text(f"عذراً، حدث خطأ أثناء إرسال رسالتك: {e}") # رد في الشات للمالك فقط في حالة الخطأ
+            await send_owner_notification(context, f"خطأ حرج: فشل إرسال رسالة المستخدم (ID: {user_id}) إلى المالك: {e}") 
+            await update.message.reply_text(f"عذراً، حدث خطأ أثناء إرسال رسالتك: {e}")
 
 # --- بداية إضافة Flask ---
 app = Flask(__name__)
