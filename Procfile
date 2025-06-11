@@ -1,1 +1,1 @@
-web: gunicorn -w 4 smain:app
+worker: python smain.py
