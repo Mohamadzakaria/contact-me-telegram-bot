@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from telegram.constants import ParseMode 
 import re 
+import os
 import datetime # لاستخدام الوقت لتحديد متى يتم إرسال رسالة الشكر مرة أخرى
 
 # 1. مفتاح API الخاص بالبوت (احصل عليه من BotFather)
@@ -201,8 +202,6 @@ def main():
 
     print("بوت التواصل يعمل الآن...")
     
-    # --- التعديل هنا: استخدام Webhooks للنشر على Render ---
-    import os # تأكد من استيراد os في بداية الملف إذا لم يكن موجوداً
 
     WEBHOOK_URL = os.environ.get('WEBHOOK_URL') # Render يوفر هذا المتغير تلقائياً
     PORT = int(os.environ.get('PORT', '10000')) # Render يوفر هذا المتغير تلقائياً، استخدم 10000 كافتراضي
